@@ -46,13 +46,13 @@ jobs:
             --keycloakClientSecret dummy-secret
 
 
-      # # 5. Run the Microcks Test (The Quality Gate)
-      # - name: Run Microcks Test
-      #   uses: microcks/test-github-action@v1
-      #   with:
-      #     apiNameAndVersion: 'Temperature Events API:1.3.0'
-      #     testEndpoint: 'kafka:9092'     # Internal Docker name
-      #     runner: 'ASYNC_API_SCHEMA'
-      #     microcksUrl: 'http://localhost:8080/api'
-      #     waitFor: '10sec'
-      #     # We disabled Keycloak in your setup, so no secrets needed!
+      # 5. Run the Microcks Test (The Quality Gate)
+      - name: Run Microcks Test
+        uses: microcks/test-github-action@v1
+        with:
+          apiNameAndVersion: 'Temperature Events API:1.3.0'
+          testEndpoint: 'kafka:9092'     # Internal Docker name
+          runner: 'ASYNC_API_SCHEMA'
+          microcksUrl: 'http://localhost:8080/api'
+          waitFor: '10sec'
+          # We disabled Keycloak in your setup, so no secrets needed!
