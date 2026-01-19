@@ -1,0 +1,59 @@
+version: '3'
+services:
+  # 1. Zookeeper (Keeps Kafka Stable)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: microcks-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - microcks-network
+
+  # 2. Kafka (The Broker - Bulletproof Version)
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: microcks-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "19092:19092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - microcks-network
+
+  # 3. Main Microcks (Uber)
+  microcks:
+    image: quay.io/microcks/microcks-uber:1.10.0
+    container_name: microcks
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - SERVICES_UPDATE_INTERVAL=0 0 0/2 * * *
+      - KEYCLOAK_ENABLED=true
+      - KAFKA_BOOTSTRAP_SERVER=kafka:9092
+      - ASYNC_MINION_URL=http://microcks-async-minion:8081
+    networks:
+      - microcks-network
+
+  # 4. Async Minion (The Worker)
+  microcks-async-minion:
+    image: quay.io/microcks/microcks-async-minion:1.10.0
+    container_name: microcks-async-minion
+    environment:
+      - MICROCKS_HOST_PORT=microcks:8080
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    networks:
+      - microcks-network
+
+networks:
+  microcks-network:
+    driver: bridge

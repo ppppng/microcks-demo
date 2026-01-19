@@ -1,0 +1,97 @@
+services:
+  # MongoDB for Microcks storage
+  mongo:
+    image: mongo:6.0
+    container_name: microcks-mongodb
+    volumes:
+      - microcks-data:/data/db
+    networks:
+      - microcks-network
+
+  # Keycloak for authentication
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0.7
+    container_name: microcks-keycloak
+    ports:
+      - "18080:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME_ADMIN_URL: http://localhost:18080
+      KC_HOSTNAME_URL: http://localhost:18080
+    command:
+      - start-dev
+    networks:
+      - microcks-network
+
+  # Kafka for async mocking - FIXED NETWORKING
+  kafka:
+    image: quay.io/strimzi/kafka:0.39.0-kafka-3.6.1
+    container_name: microcks-kafka
+    command:
+      - sh
+      - -c
+      - >
+        export CLUSTER_ID=$$(bin/kafka-storage.sh random-uuid) &&
+        bin/kafka-storage.sh format -t $$CLUSTER_ID -c config/kraft/server.properties &&
+        bin/kafka-server-start.sh config/kraft/server.properties
+        --override advertised.listeners=PLAINTEXT://kafka:9092
+        --override listeners=PLAINTEXT://0.0.0.0:9092
+        --override listener.security.protocol.map=PLAINTEXT:PLAINTEXT
+    ports:
+      - "19092:9092"
+    environment:
+      LOG_DIR: /tmp/logs
+    networks:
+      - microcks-network
+
+  # Microcks main application
+  microcks:
+    image: quay.io/microcks/microcks:1.10.0
+    container_name: microcks
+    depends_on:
+      - mongo
+      - keycloak
+      - kafka
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017
+      - SPRING_DATA_MONGODB_DATABASE=microcks
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_PUBLIC_URL=http://localhost:18080
+      - ASYNC_MINION_URL=http://microcks-async-minion:8081
+      - KAFKA_BOOTSTRAP_SERVER=kafka:9092
+    networks:
+      - microcks-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Async Minion for Kafka/async protocols - FIXED CONFIG
+  microcks-async-minion:
+    image: quay.io/microcks/microcks-async-minion:1.10.0
+    container_name: microcks-async-minion
+    depends_on:
+      - kafka
+      - microcks
+    ports:
+      - "8081:8081"
+    environment:
+      - QUARKUS_PROFILE=docker-compose
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - MICROCKS_HOST_PORT=microcks:8080
+    networks:
+      - microcks-network
+    restart: on-failure
+
+networks:
+  microcks-network:
+    driver: bridge
+
+volumes:
+  microcks-data:

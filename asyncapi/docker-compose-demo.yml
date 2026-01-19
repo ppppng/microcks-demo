@@ -1,0 +1,75 @@
+services:
+
+  microcks-db:
+    image: mongo:4.4.29
+    container_name: microcks-db
+    ports:
+      - "27017:27017"
+
+  microcks-zookeeper:
+    image: quay.io/strimzi/kafka:0.43.0-kafka-3.8.0
+    container_name: microcks-zookeeper
+    command:
+      - sh
+      - -c
+      - bin/zookeeper-server-start.sh config/zookeeper.properties
+    ports:
+      - "2181:2181"
+
+  microcks-kafka:
+    image: quay.io/strimzi/kafka:0.43.0-kafka-3.8.0
+    container_name: microcks-kafka
+    depends_on:
+      - microcks-zookeeper
+    command:
+      - sh
+      - -c
+      - |
+        bin/kafka-server-start.sh config/server.properties \
+        --override zookeeper.connect=microcks-zookeeper:2181 \
+        --override listeners=PLAINTEXT://0.0.0.0:9092 \
+        --override advertised.listeners=PLAINTEXT://microcks-kafka:9092 \
+        --override offsets.topic.replication.factor=1
+    ports:
+      - "9092:9092"
+
+  microcks-sso:
+    image: quay.io/keycloak/keycloak:26.0.0
+    container_name: microcks-sso
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "18080:8080"
+
+  microcks-postman-runtime:
+    image: quay.io/microcks/microcks-postman-runtime:0.7.1
+    container_name: microcks-postman-runtime
+
+  microcks:
+    image: quay.io/microcks/microcks:1.13.2
+    container_name: microcks
+    depends_on:
+      - microcks-db
+      - microcks-sso
+      - microcks-postman-runtime
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://microcks-db:27017/microcks
+      KEYCLOAK_URL: http://microcks-sso:8080
+      POSTMAN_RUNNER_URL: http://microcks-postman-runtime:3000
+
+  microcks-async-minion:
+    image: quay.io/microcks/microcks-async-minion:1.13.2
+    container_name: microcks-async-minion
+    depends_on:
+      - microcks
+      - microcks-kafka
+    ports:
+      - "8081:8081"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: microcks-kafka:9092
+      MICROCKS_URL: http://microcks:8080

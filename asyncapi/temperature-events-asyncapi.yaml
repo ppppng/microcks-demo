@@ -1,0 +1,58 @@
+asyncapi: 2.6.0
+
+info:
+  title: Temperature Events API
+  version: "1.3.0"
+  description: Consumer validates temperature events
+
+# --- FIX: POINT TO LOCAL DOCKER KAFKA ---
+servers:
+  dev:
+    url: kafka:9092
+    protocol: kafka
+    description: Local Docker Kafka Broker
+# ----------------------------------------
+
+defaultContentType: application/json
+
+channels:
+  TemperatureEventsAPI-1.3.0-temperature.measured:
+    description: Channel for consuming temperature measurements
+    subscribe:
+      summary: Service consumes temperature events
+      operationId: consumeTemperatureMeasured
+      
+      # FORCE MOCKS TO START
+      x-microcks-operation:
+        frequency: 3
+        dispatcher: SEQUENCE
+        
+      message:
+        $ref: "#/components/messages/TemperatureMeasured"
+
+components:
+  messages:
+    TemperatureMeasured:
+      name: TemperatureMeasured
+      title: Temperature measurement event
+      payload:
+        type: object
+        properties:
+          sensorId:
+            type: string
+          value:
+            type: number
+          unit:
+            type: string
+            enum: [C, F]
+          measuredAt:
+            type: string
+            format: date-time
+      examples:
+        - name: validTemperatureEvent
+          summary: Valid temperature reading
+          payload:
+            sensorId: "sensor-1"
+            value: 25.5
+            unit: "C"
+            measuredAt: "2026-01-18T12:00:00Z"
