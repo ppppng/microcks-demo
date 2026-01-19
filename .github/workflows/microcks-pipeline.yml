@@ -15,7 +15,6 @@ jobs:
       - name: Start Microcks & Kafka
         run: |
           cd asyncapi
-          # Turn off Keycloak so we don't need real passwords
           sed -i 's/KEYCLOAK_ENABLED=true/KEYCLOAK_ENABLED=false/g' docker-compose-final.yml
           docker compose -f docker-compose-final.yml up -d
           echo "Waiting 60s for containers to initialize..."
@@ -35,14 +34,13 @@ jobs:
           echo "Producer running... waiting 10s for data flow"
           sleep 10
 
-      # 4. Run Microcks Test (Using Docker on Host Network)
+      # 4. Run Microcks Test (Clean Command Syntax)
       - name: Run Microcks Test
         run: |
-          # We use 'docker run --network host' so the container can see localhost:8080
-          docker run --network host --rm quay.io/microcks/microcks-cli:latest test 'Temperature Events API:1.3.0' \
-            --testEndpoint='kafka:9092' \
-            --runner='ASYNC_API_SCHEMA' \
-            --microcksURL='http://localhost:8080/api' \
-            --waitFor='10sec' \
-            --keycloakClientId='microcks-serviceaccount' \
-            --keycloakClientSecret='dummy-secret'
+          docker run --network host --rm quay.io/microcks/microcks-cli:0.5.6 test "Temperature Events API:1.3.0" \
+            --testEndpoint=kafka:9092 \
+            --runner=ASYNC_API_SCHEMA \
+            --microcksURL=http://localhost:8080/api \
+            --waitFor=10sec \
+            --keycloakClientId=microcks-serviceaccount \
+            --keycloakClientSecret=dummy-secret
