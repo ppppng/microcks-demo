@@ -11,21 +11,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # 1. Start Docker (Inside asyncapi folder)
+      # 1. Start Docker (Force Keycloak OFF via environment variable)
       - name: Start Microcks & Kafka
         run: |
           cd asyncapi
+          # We force KEYCLOAK_ENABLED=false so we don't need real passwords
+          sed -i 's/KEYCLOAK_ENABLED=true/KEYCLOAK_ENABLED=false/g' docker-compose-final.yml
           docker compose -f docker-compose-final.yml up -d
           echo "Waiting 60s for containers to initialize..."
           sleep 60
           docker ps
 
-      # 2. Import Contract (Inside asyncapi folder)
+      # 2. Import Contract
       - name: Import API Contract
         run: |
           curl -X POST -F "file=@asyncapi/temperature-events-asyncapi.yaml" http://localhost:8080/api/artifact/upload
 
-      # 3. Run Producer (Inside order-service folder)
+      # 3. Run Producer
       - name: Run Python Producer
         run: |
           pip install confluent-kafka
@@ -33,7 +35,7 @@ jobs:
           echo "Producer running... waiting 10s for data flow"
           sleep 10
 
-      # 4. Run Test
+      # 4. Run Test (With Dummy Credentials to satisfy the CLI)
       - name: Run Microcks Test
         uses: microcks/test-github-action@v1
         with:
@@ -42,3 +44,6 @@ jobs:
           runner: 'ASYNC_API_SCHEMA'
           microcksUrl: 'http://localhost:8080/api'
           waitFor: '10sec'
+          # These are required arguments, but "dummy" works because Keycloak is OFF
+          keycloakClientId: 'microcks-serviceaccount'
+          keycloakClientSecret: 'dummy-secret'
