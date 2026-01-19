@@ -34,13 +34,15 @@ jobs:
           echo "Producer running... waiting 10s for data flow"
           sleep 10
 
-      # 4. Run Microcks Test (Fixed: Using Positional Arguments)
+      # 4. Run Microcks Test (Native CLI Method - Failsafe)
       - name: Run Microcks Test
         run: |
-          docker run --network host --rm quay.io/microcks/microcks-cli:0.5.6 test \
-            "Temperature Events API:1.3.0" \
-            kafka:9092 \
-            ASYNC_API_SCHEMA \
+          # Download the CLI binary directly to the host (Avoiding Docker networking/quoting issues)
+          curl -fSL https://github.com/microcks/microcks-cli/releases/download/0.5.6/microcks-cli_0.5.6_linux_x86_64.tar.gz -o microcks-cli.tar.gz
+          tar -zxf microcks-cli.tar.gz
+          
+          # Execute directly on the runner
+          ./microcks-cli test "Temperature Events API:1.3.0" kafka:9092 ASYNC_API_SCHEMA \
             --microcksURL=http://localhost:8080/api \
             --waitFor=10sec \
             --keycloakClientId=microcks-serviceaccount \
